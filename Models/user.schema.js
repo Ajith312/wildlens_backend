@@ -38,7 +38,7 @@ const userSchema = mongoose.Schema({
         default: false,
     },
     pwd_verify_string: {
-        type: String,
+        type: Number,
         default: null,
     },
     reset_time: {

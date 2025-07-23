@@ -181,13 +181,16 @@ export const forgetPassword = async (req, res) => {
 
 export const changePassword = async (req, res) => {
   try {
-    const { pwd_verify_string, password } = req.body;
-    if(!pwd_verify_string || !password){
+    const { pwd_verify_string, password,email } = req.body;
+    if(!pwd_verify_string || !password || !email){
       return sendResponse(res, 200, "All the field is required",[],400,false)
     }
-    const user = await User.findOne({ pwd_verify_string });
+    const user = await User.findOne({ email });
     if (!user) {
-      return sendResponse(res, 200, "Invalid OTP",[],400,false);
+      return sendResponse(res, 200, "Invalid user",[],400,false);
+    }
+    if (user.pwd_verify_string !==pwd_verify_string) {
+      return sendResponse(res, 200, "Invalid otp",[],400,false);
     }
     if (user.activation_status === false) {
       return sendResponse(res, 200, "Account not activated",[],401,false);
