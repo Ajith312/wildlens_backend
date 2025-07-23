@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import dotenv from "dotenv";
 import jwt from "jsonwebtoken";
 import { sendResponse } from "../Utils/response.js";
+import { accountactivationMail, forgetPasswordmail } from "../Services/nodemailer.service.js";
 
 dotenv.config();
 
@@ -33,6 +34,7 @@ export const userRegister = async (req, res) => {
       user_role: "user",
     });
     await newUser.save();
+    await accountactivationMail(email,otp)
     return sendResponse(res,200,"Account Activation link send to your mail",[],201,true)
   } catch (error) {
     console.log(error);
@@ -59,7 +61,7 @@ export const activateUser = async (req, res) => {
       return sendResponse(res,200,"OTP expired Please click Resend OTP",[],400,false)
     }
 
-    if (user.otp !== otp || user.otp_expiry < Date.now()) {
+    if (user.otp !== Number(otp)|| user.otp_expiry < Date.now()) {
         user.otp = null, 
         user.otp_expiry = null,
         await user.save()
@@ -100,6 +102,7 @@ try {
 
   user.otp=otp;
   user.otp_expiry=otp_expiry
+  await accountactivationMail(email,otp)
   await user.save()
   return sendResponse(res, 200, "OTP sent to your register Email",[],200,true);
 
@@ -168,6 +171,7 @@ export const forgetPassword = async (req, res) => {
     user.pwd_verify_string = pwd_verify_string;
 
     await user.save();
+    await forgetPasswordmail(email,pwd_verify_string)
     return sendResponse(res, 200, "OTP sent to your register E-mail",[],200,true);
   } catch (error) {
     console.log(error);
