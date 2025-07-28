@@ -2,6 +2,7 @@ import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
 import userRoutes from './Routers/user.router.js'
+import tourRoutes from './Routers/tour.router.js'
 import connectDb from './Database/db_config.js'
 
 
@@ -26,6 +27,7 @@ app.get('/',(req,res)=>{
 })
 connectDb()
 app.use('/api/user',userRoutes)
+app.use('/api/tour',tourRoutes)
 
 
 
