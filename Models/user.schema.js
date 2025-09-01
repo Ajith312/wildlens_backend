@@ -25,6 +25,10 @@ const userSchema = mongoose.Schema({
         type: String,
         default: null,
     },
+    profile_picture:{
+        type:String
+
+    },
     otp: {
         type: Number,
         default: null
@@ -44,6 +48,12 @@ const userSchema = mongoose.Schema({
     reset_time: {
         type: Number,
         default: null,
+    },
+    phone_number:{
+        type:Number
+    },
+    date_of_birth:{
+        type:String
     }
 }, {
     timestamps: true

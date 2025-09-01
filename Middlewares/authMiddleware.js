@@ -6,33 +6,41 @@ import { sendResponse } from "../Utils/response.js";
 dotenv.config()
 
 
-const authMiddleware = (allowedRoles)=> async(req,res,next)=>{
-
-    const token =  req.headers?.authorization?.split(' ')[1];
-    if(!token){
-        return sendResponse(res, 401, "Token is missing", null, 401, false);
-    }
+const authMiddleware = (allowedRoles) => async (req, res, next) => {
     try {
-        const decoded = jwt.verify(token,process.env.JWT_SECRET)
-        req.user=decoded;
+        if (!req.headers.authorization) {
+            return sendResponse(res, 401, "Token is missing", null, 401, false);
+        }
 
+        const token = req.headers.authorization.split(" ")[1];
+        if (!token) {
+            return sendResponse(res, 401, "Token is missing", null, 401, false);
+        }
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        if (!decoded) {
+            return sendResponse(res, 401, "Invalid token. Please login again", null, 401, false);
+        }
+        req.user = decoded;
         const user = await User.findById(req.user._id)
-        if(!user){
+        if (!user) {
             return sendResponse(res, 401, "Un Authorized User", null, 401, false);
         }
         const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
-        if (!roles.includes(user.userRole)) {
+        if (!roles.includes(user.user_role)) {
             return sendResponse(res, 403, "Unauthorized user role", null, 403, false);
-          }
+        }
         next()
-        
+
     } catch (error) {
-       console.log(error)
-       if(error.name === "TokenExpiredError"){
-        sendResponse(res,401,"Token expired",null,401,false)
-       }
-       sendResponse(res,500,"Internal server error",null,500,false)
+        console.log("JWT Verification Error:", error)
+        if (error.name === "TokenExpiredError") {
+            sendResponse(res, 401, "Token expired", null, 401, false)
+        }
+        sendResponse(res, 500, "Internal server error", null, 500, false)
+
     }
 }
+
 
 export default authMiddleware

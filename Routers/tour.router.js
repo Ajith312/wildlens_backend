@@ -1,14 +1,26 @@
 import express from 'express'
-import { createNewTour, deleteTourPlan, editTourPlan, getAllTours } from '../Controllers/tour.controller.js'
+import { addToCart, bookTour, createNewTour, deleteTourPlan,editTour,filterTours,getAllBookings,getAllTours, getCountryLists, getEnquiry, getUserBookingHistory, getUserCartList, getUserUpcomingBookings, removeFromCart, sendEnquiry, uploadTourGallery } from '../Controllers/tour.controller.js'
+import authMiddleware from '../Middlewares/authMiddleware.js'
+import { handleMulterErrors, upload } from '../Middlewares/multer.js'
 
 const router = express.Router()
 
-router.post('/create_tour', createNewTour)
-router.post('/create_tour/:tourId', createNewTour)
-router.patch('/edit_plan/:planId',editTourPlan)
-router.delete('/delete_plan/:planId', deleteTourPlan)
-router.get('/get_all_tours',getAllTours)
-
+router.post('/create_tour',authMiddleware('admin'), createNewTour)
+router.patch('/edit_tour/:tourId',authMiddleware('admin'),editTour)
+router.delete('/delete_tour/:tourId',authMiddleware('admin'), deleteTourPlan)
+router.get('/get_all_tours',authMiddleware(['admin','user']),getAllTours)
+router.get('/get-country-list',authMiddleware(['admin','user']),getCountryLists)
+router.post('/book-tour/:tourId',authMiddleware(['admin','user']),bookTour)
+router.get('/get-all-bookings',getAllBookings)
+router.post('/gallery/:tourId',authMiddleware('admin'),upload.array('images',10),handleMulterErrors,uploadTourGallery)
+router.post('/filter-tour',authMiddleware(['admin','user']),filterTours)
+router.post('/send-enquiry',authMiddleware('user'),sendEnquiry)
+router.get('/get-enquiry',authMiddleware('admin'),getEnquiry)
+router.post('/addtocart/:id',authMiddleware('user'),addToCart)
+router.get('/get-user-cartdetails',authMiddleware('user'),getUserCartList)
+router.delete('/remove-from-cart/:id',authMiddleware('user'),removeFromCart)
+router.get('/get-upcomming-bookings',authMiddleware('user'),getUserUpcomingBookings)
+router.get('/get-booking-history',authMiddleware('user'),getUserBookingHistory)
 
 
 
