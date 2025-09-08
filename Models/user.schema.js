@@ -6,6 +6,13 @@ const userSchema = mongoose.Schema({
         required: true,
         trim: true
     },
+    last_name:{
+         type: String,
+          trim: true
+    },
+    address:{
+        type:String
+    },
     email: {
         type: String,
         required: true,
@@ -28,6 +35,9 @@ const userSchema = mongoose.Schema({
     profile_picture:{
         type:String
 
+    },
+    profile_picture_public_id: { 
+        type: String 
     },
     otp: {
         type: Number,
@@ -54,7 +64,7 @@ const userSchema = mongoose.Schema({
     },
     date_of_birth:{
         type:String
-    }
+    },
 }, {
     timestamps: true
 });

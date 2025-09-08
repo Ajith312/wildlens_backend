@@ -1,5 +1,5 @@
 import express from 'express'
-import { addToCart, bookTour, createNewTour, deleteTourPlan,editTour,filterTours,getAllBookings,getAllTours, getCountryLists, getEnquiry, getUserBookingHistory, getUserCartList, getUserUpcomingBookings, removeFromCart, sendEnquiry, uploadTourGallery } from '../Controllers/tour.controller.js'
+import { addToCart, bookTour, bookTourByAdmin, cancelBookingByAdmin, confirmBookingByAdmin, createNewTour, deleteTourPlan,editTour,filterTours,getAllBookings,getAllTours, getAllToursForAdmin,getCountryLists, getEnquiry, getUserBookingHistory, getUserCartList, getUserUpcomingBookings, removeFromCart, sendEnquiry, uploadTourGallery } from '../Controllers/tour.controller.js'
 import authMiddleware from '../Middlewares/authMiddleware.js'
 import { handleMulterErrors, upload } from '../Middlewares/multer.js'
 
@@ -9,9 +9,13 @@ router.post('/create_tour',authMiddleware('admin'), createNewTour)
 router.patch('/edit_tour/:tourId',authMiddleware('admin'),editTour)
 router.delete('/delete_tour/:tourId',authMiddleware('admin'), deleteTourPlan)
 router.get('/get_all_tours',authMiddleware(['admin','user']),getAllTours)
+router.get('/get-alltours-admin',authMiddleware('admin'),getAllToursForAdmin)
 router.get('/get-country-list',authMiddleware(['admin','user']),getCountryLists)
 router.post('/book-tour/:tourId',authMiddleware(['admin','user']),bookTour)
-router.get('/get-all-bookings',getAllBookings)
+router.post('/book-tour-byadmin',authMiddleware('admin'),bookTourByAdmin)
+router.get('/get-all-bookings',authMiddleware('admin'),getAllBookings)
+router.patch('/confirm-booking/:id',authMiddleware('admin'),confirmBookingByAdmin)
+router.patch('/cancel-booking/:id',authMiddleware('admin'),cancelBookingByAdmin)
 router.post('/gallery/:tourId',authMiddleware('admin'),upload.array('images',10),handleMulterErrors,uploadTourGallery)
 router.post('/filter-tour',authMiddleware(['admin','user']),filterTours)
 router.post('/send-enquiry',authMiddleware('user'),sendEnquiry)

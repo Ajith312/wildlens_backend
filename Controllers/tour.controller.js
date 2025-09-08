@@ -109,6 +109,27 @@ export const getAllTours = async (req, res) => {
   }
 }
 
+export const getAllToursForAdmin = async (req,res)=>{
+  try {
+     const tours = await Tour.find({},
+      {
+        _id:1,
+        title:1,
+      }).sort({ createdAt: -1 })
+
+      if(tours && tours.length>0){
+          return sendResponse(res, 200, 'Tour Details send successfully', tours, 200, true)
+      }else{
+          return sendResponse(res, 200, 'Tour Details send successfully', [], 200, true)
+      }
+     
+    
+  } catch (error) {
+    console.error('getAllTours error:', error)
+    return sendResponse(res, 500, 'Internal Server Error', null, 500, false)
+  }
+}
+
 export const getCountryLists = async (req,res)=>{
   try {
     const countries  = await Tour.distinct("country")
@@ -160,10 +181,48 @@ export const bookTour = async (req, res) => {
   }
 }
 
+export const bookTourByAdmin = async (req, res) => {
+  try {
+    const bookingDetails = req.body
+
+
+    const tour = await Tour.findById(bookingDetails?.tour_id)
+    if (!tour) {
+      return sendResponse(res, 200, "Invalid Tour Packages", null, 404, false)
+    }
+     const user = await User.findById(bookingDetails?.user_id)
+       if (!user) {
+      return sendResponse(res, 200, "Invalid User", null, 404, false)
+    }
+    
+    const requiredFields = ['first_name', 'last_name', 'address', 'booking_date']
+    for (let field of requiredFields) {
+      if (!bookingDetails[field]) {
+        return sendResponse(res, 400, `Missing required field: ${field}`, null, 400, false)
+      }
+    }
+    console.log(bookingDetails,'bookingDetails')
+    const newBooking = {
+      ...bookingDetails
+    }
+
+    const booking = new Booking(newBooking)
+    booking.save()
+
+    return sendResponse(res, 200, "Booking created succesfully", null, 200, true)
+
+
+  } catch (error) {
+    console.log("Error in bookTour",error)
+    return sendResponse(res, 500, 'Internal Server Error', null, 500, false)
+
+  }
+}
+
 export const cancelBooking = async (req, res) => {
   try {
-    const bookingId = req.params.id;
-    const userId = req.user._id;
+    const bookingId = req.params.id
+    const userId = req.user._id
 
     if (!bookingId) {
       return sendResponse(res, 200, "Booking id is missing", [], 400, false)
@@ -177,7 +236,7 @@ export const cancelBooking = async (req, res) => {
 
 
     booking.booking_status = "cancelled"
-    booking.tour_status = "cancelled"
+    // booking.tour_status = "cancelled"
     await booking.save()
 
     return sendResponse(res, 200, "Booking cancelled successfully", booking, 200, true)
@@ -191,43 +250,144 @@ export const cancelBooking = async (req, res) => {
 
 export const getAllBookings = async (req, res) => {
   try {
+    const { page = 1, limit = 10, search = "", status } = req.query
 
-    const bookings = await Booking.aggregate([{
-      $lookup: {
-        from: "tours",
-        localField: "tour_id",
-        foreignField: "_id",
-        as: "Tour_Details"
-      }
-    },
-    {
-      $unwind: "$Tour_Details"
-    },
-    {
-      $project: {
-        first_name: 1,
-        last_name: 1,
-        booking_date: 1,
-        booking_status: 1,
-        payment_status: 1,
-        title: "$Tour_Details.title",
-        country: "$Tour_Details.country",
-        budget: "$Tour_Details.budget",
-        plan_title:"$Tour_Details.plan_title"
+    const skip = (parseInt(page) - 1) * parseInt(limit)
+    const perPage = parseInt(limit)
+
+
+    const matchStage = {}
+    if (status != "all") {
+      if (status) {
+        matchStage.booking_status = status
       }
     }
+    if (search) {
+      matchStage.$or = [
+        { first_name: { $regex: search, $options: "i" } },
+        { last_name: { $regex: search, $options: "i" } },
+        { "Tour_Details.title": { $regex: search, $options: "i" } },
+        { "Tour_Details.country": { $regex: search, $options: "i" } }
+      ]
+    }
+
+    const result = await Booking.aggregate([
+      {
+        $lookup: {
+          from: "tours",
+          localField: "tour_id",
+          foreignField: "_id",
+          as: "Tour_Details"
+        }
+      },
+      { $unwind: "$Tour_Details" },
+
+      {
+        $facet: {
+          details: [
+            { $match: matchStage },
+            {
+              $project: {
+                first_name: 1,
+                last_name: 1,
+                booking_date: 1,
+                booking_status: 1,
+                payment_status: 1,
+                number_of_persons:1,
+                guide_required:1,
+                comments:1,
+                address:1,
+                title: "$Tour_Details.title",
+                country: "$Tour_Details.country",
+                budget: "$Tour_Details.budget",
+                plan_title: "$Tour_Details.plan_title"
+              }
+            },
+            { $sort: { createdAt: -1 } },
+            // { $skip: skip },
+            // { $limit: perPage }
+          ],
+          stats: [
+            {
+              $group: {
+                _id: null,
+                totalBookings: { $sum: 1 },
+                completedCount: {
+                  $sum: { $cond: [{ $eq: ["$booking_status", "completed"] }, 1, 0] }
+                },
+                pendingCount: {
+                  $sum: { $cond: [{ $eq: ["$booking_status", "pending"] }, 1, 0] }
+                },
+                cancelledCount: {
+                  $sum: { $cond: [{ $eq: ["$booking_status", "cancelled"] }, 1, 0] }
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        $project: {
+          details: 1,
+          stats: { $arrayElemAt: ["$stats", 0] }
+        }
+      }
     ])
 
-    console.log(bookings ,'bookings')
 
-    return sendResponse(res,200,"Booking details fetched succesfully",bookings,200,true)
+    const bookings = result[0] || { details: [], stats: {} }
+
+    return sendResponse(
+      res,200,"Booking details fetched successfully",{...bookings,page: parseInt(page),limit: perPage},200,true)
   } catch (error) {
-    console.log(error)
-    return sendResponse(res, 500, 'Internal Server Error', null, 500, false)
+    console.error(error)
+    return sendResponse(res, 500, "Internal Server Error", null, 500, false);
+  }
+};
 
+export const confirmBookingByAdmin = async (req,res)=>{
+  try {
+    const bookingId = req.params.id
+    if (!bookingId) {
+      return sendResponse(res, 200, "Booking id is missing", null, 400, false)
+    }
+    const booking = await Booking.findByIdAndUpdate(
+      bookingId,
+      { booking_status: "confirmed", tour_status: "confirmed" },
+      { new: true }
+    )
+    if (!booking) {
+      return sendResponse(res, 200, "Invalid Booking", null, 404, false)
+    }
+    return sendResponse(res, 200, "Booking confirmed", null, 200, true)
+
+  } catch (error) {
+     console.error(error)
+    return sendResponse(res, 500, "Internal Server Error", null, 500, false);
   }
 }
 
+export const cancelBookingByAdmin = async (req,res)=>{
+  try {
+    const bookingId = req.params.id
+    if (!bookingId) {
+      return sendResponse(res, 200, "Booking id is missing", null, 400, false)
+    }
+    const booking = await Booking.findByIdAndUpdate(
+      bookingId,
+      { booking_status: "cancelled", tour_status: "cancelled" },
+      { new: true }
+    )
+    if (!booking) {
+      return sendResponse(res, 200, "Invalid Booking", null, 404, false)
+    }
+    return sendResponse(res, 200, "Booking Cancelled", null, 200, true)
+
+  } catch (error) {
+     console.error(error)
+    return sendResponse(res, 500, "Internal Server Error", null, 500, false);
+  }
+}
 
 export const uploadTourGallery = async (req, res) => {
   try {

@@ -1,5 +1,5 @@
 import express from "express"
-import {activateUser, changePassword, forgetPassword, getAllUsers, getProfileDetails, getRefreshToken, getUserDetails, resendOTP, uploadProfilePictute, userLogin, userRegister } from "../Controllers/user.controller.js"
+import {activateUser, changePassword, editUserProfile, forgetPassword, getAllUsers, getProfileDetails, getRefreshToken, getUserDetails, resendOTP, uploadProfilePictute, userLogin, userRegister } from "../Controllers/user.controller.js"
 import authMiddleware from "../Middlewares/authMiddleware.js"
 import { handleMulterErrors, upload } from "../Middlewares/multer.js"
 
@@ -18,6 +18,7 @@ router.get('/get-profile-details',authMiddleware(['admin','user']),getProfileDet
 router.get('/get-all-users',authMiddleware('admin'),getAllUsers)
 router.get('/get-user-details/:userId',authMiddleware('admin'),getUserDetails)
 router.post('/upload-profileimage',authMiddleware(['admin','user']),upload.single('image'),handleMulterErrors,uploadProfilePictute)
+router.patch('/edit-user-profile',authMiddleware(['user','admin']),editUserProfile)
 
 
 export default router

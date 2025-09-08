@@ -243,7 +243,7 @@ export const changePassword = async (req, res) => {
        return sendResponse(res, 200, "Invalid User id", [], 400, false)
     }
 
-    const user = await User.findOne({_id:userId},{_id:0,user_name:1,email:1,phone_number:1,date_of_birth:1,profile_picture:1})
+    const user = await User.findOne({_id:userId},{_id:0,user_name:1,email:1,phone_number:1,date_of_birth:1,profile_picture:1,last_name:1,address:1})
     if(!user){
       return sendResponse(res,200,"User not found",[],401,false)
     }
@@ -316,7 +316,12 @@ export const getUserDetails = async (req, res) => {
           as: "booking_details"
         }
       },
-      { $unwind: "$booking_details" },
+      {
+        $unwind: {
+          path: "$booking_details",
+          preserveNullAndEmptyArrays: true
+        }
+      },
       {
         $lookup: {
           from: "tours",
@@ -325,27 +330,36 @@ export const getUserDetails = async (req, res) => {
           as: "tour_details"
         }
       },
-      { $unwind: "$tour_details" },
+      {
+        $unwind: {
+          path: "$tour_details",
+          preserveNullAndEmptyArrays: true
+        }
+      },
       {
         $group: {
           _id: "$_id",
           user_name: { $first: "$user_name" },
           email: { $first: "$email" },
-          profile_picture:{$first:"$profile_picture"},
-          join_date:{$first:"$createdAt"},
-          phone_number:{$first:"$phone_number"},
+          profile_picture: { $first: "$profile_picture" },
+          join_date: { $first: "$createdAt" },
+          phone_number: { $first: "$phone_number" },
           booking_details: {
             $push: {
               booking_date: "$booking_details.booking_date",
               persons: "$booking_details.number_of_persons",
               payment_status: "$booking_details.payment_status",
               booking_status: "$booking_details.booking_status",
-              tour_status:"$booking_details.tour_status",
+              tour_status: "$booking_details.tour_status",
               title: "$tour_details.title",
               budget: "$tour_details.budget"
             }
           },
-          total_bookings: { $sum: 1 },
+          total_bookings: {
+            $sum: {
+              $cond: [{ $ifNull: ["$booking_details._id", false] }, 1, 0]
+            }
+          },
           total_amount: { $sum: "$tour_details.budget" }
         }
       }
@@ -381,7 +395,7 @@ export const getRefreshToken = async (req, res) => {
     const newToken = jwt.sign({ _id: user._id }, process.env.JWT_SECRET, {
       expiresIn: "2h",
     });
-    return sendResponse(res, 200, "Refresh token sent successfully", { token: newToken }, 200, true)
+    return sendResponse(res, 200, "Refresh token sent successfully", { token: newToken,role:user?.user_role }, 200, true)
   } catch (error) {
     console.error("Error in getRefreshToken:", error.message);
     return sendResponse(res, 500, "Internal Server Error");
@@ -391,14 +405,25 @@ export const getRefreshToken = async (req, res) => {
 
 export const uploadProfilePictute = async (req, res) => {
   try {
-    const userId = req.user._id
+    const userId = req.user._id;
+
     if (!req.file) {
       return sendResponse(res, 400, "No image file provided")
     }
 
+    const user = await User.findById(userId)
+    if (!user) {
+      return sendResponse(res, 404, "User not found")
+    }
+
+
+    if (user.profile_picture_public_id) {
+      await cloudinary.uploader.destroy(user.profile_picture_public_id)
+    }
+
     const b64 = Buffer.from(req.file.buffer).toString("base64")
-     const dataURI = `data:${req.file.mimetype};base64,${b64}`
-    
+    const dataURI = `data:${req.file.mimetype};base64,${b64}`
+
     const result = await cloudinary.uploader.upload(dataURI, {
       folder: "profile_pictures",
       transformation: [
@@ -407,18 +432,35 @@ export const uploadProfilePictute = async (req, res) => {
       ]
     })
 
-    const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      { profile_picture: result.secure_url },
-      { new: true })
+    user.profile_picture = result.secure_url
+    user.profile_picture_public_id = result.public_id
+    await user.save()
+
+    return sendResponse(res,200,"Profile picture uploaded successfully",{profile_picture: result.secure_url},200,true)
+  } catch (error) {
+    console.error("Error in uploadProfilePictute:", error.message)
+     return sendResponse(res, 500, "Internal Server Error")
+  }
+};
+
+export const editUserProfile = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { user_name, last_name, email, phone_number, address } = req.body;
+
+    const updatedUser = await User.findByIdAndUpdate(userId,
+      {$set: { user_name, last_name, email, phone_number, address }},
+      { new: true, runValidators: true } 
+    )
 
     if (!updatedUser) {
-      return sendResponse(res, 404, "User not found")
+      return sendResponse(res, 404, "Invalid user", [], 404, false)
     }
 
-    return sendResponse(res,200,"Profile picture uploaded successfully",{profile_picture: result.secure_url},true);
+    return sendResponse(res,200,"Personal information changed successfully",null,200,true)
+
   } catch (error) {
-    console.error("Error in uploadProfilePictute:", error.message);
-    return sendResponse(res, 500, error.message || "Internal Server Error");
+    console.error("Error in editUserProfile:", error.message);
+    return sendResponse(res, 500, "Internal Server Error");
   }
 };
